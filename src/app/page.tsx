@@ -16,11 +16,14 @@ export default function Home() {
     });
 
     const data = await response.json();
-    const audio = new Audio(`data:audio/mp3;base64,${data.audioContent}`);
-    audio.play();
-    const audioBlob = new Blob([new Uint8Array(data.audioContent)], {
-      type: "audio/mp3",
-    });
+
+    const audioContent = atob(data.audioContent);
+    const audioArray = new Uint8Array(audioContent.length);
+    for (let i = 0; i < audioContent.length; i++) {
+      audioArray[i] = audioContent.charCodeAt(i);
+    }
+
+    const audioBlob = new Blob([audioArray], { type: "audio/mp3" });
     const audioUrl = URL.createObjectURL(audioBlob);
     setAudioUrl(audioUrl);
   };
@@ -29,7 +32,7 @@ export default function Home() {
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
       <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
         <Image
-          className="h-auto"
+          className="w-40 h-auto"
           src="https://rime.ai/_nuxt/RimeSpeechTech_Logo.2582e20f.svg"
           alt="Rime logo"
           width={180}
@@ -51,7 +54,7 @@ export default function Home() {
             Play Audio
           </button>
           {audioUrl && (
-            <audio controls src={audioUrl} className="mt-4">
+            <audio controls src={audioUrl} className="mt-4" autoPlay>
               Your browser does not support the audio element.
             </audio>
           )}

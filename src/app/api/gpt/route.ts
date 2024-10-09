@@ -3,21 +3,15 @@ import { NextRequest, NextResponse } from "next/server";
 async function handler(request: NextRequest) {
   const { text } = await request.json();
 
-  const response = await fetch("https://users.rime.ai/v1/rime-tts", {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
-      Accept: "application/json",
-      Authorization: `Bearer ${process.env.RIME_API_KEY}`,
       "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
     },
     body: JSON.stringify({
-      speaker: "lagoon",
-      text: text,
-      modelId: "mist",
-      samplingRate: 22050,
-      speedAlpha: 1.0,
-      audioFormat: "mp3",
-      reduceLatency: false,
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: text }],
     }),
   });
 

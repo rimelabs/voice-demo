@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { Mic, MicOff, Send, Play, Pause, Loader, X } from "lucide-react";
 
@@ -49,93 +49,96 @@ export default function Home() {
     return () => clearInterval(intervalId);
   }, [isLoading]);
 
-  const handleSendMessage = async (text: string) => {
-    setMessages((prev) => [
-      ...prev,
-      { text, isUser: true },
-      { text: ".", isUser: false, isLoading: true },
-    ]);
-    setInputText("");
-    setIsLoading(true);
+  const handleSendMessage = useCallback(
+    async (text: string) => {
+      setMessages((prev) => [
+        ...prev,
+        { text, isUser: true },
+        { text: ".", isUser: false, isLoading: true },
+      ]);
+      setInputText("");
+      setIsLoading(true);
 
-    abortControllerRef.current = new AbortController();
+      abortControllerRef.current = new AbortController();
 
-    try {
-      const conversationHistory = messages.map((message) => ({
-        role: message.isUser ? "user" : "assistant",
-        content: message.text,
-      }));
+      try {
+        const conversationHistory = messages.map((message) => ({
+          role: message.isUser ? "user" : "assistant",
+          content: message.text,
+        }));
 
-      const response = await fetch("/api/gpt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text,
-          conversationHistory,
-        }),
-        signal: abortControllerRef.current.signal,
-      });
+        const response = await fetch("/api/gpt", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text,
+            conversationHistory,
+          }),
+          signal: abortControllerRef.current.signal,
+        });
 
-      const data = await response.json();
-      const botResponse =
-        data.choices && data.choices[0] && data.choices[0].message
-          ? data.choices[0].message.content
-          : "I'm sorry, I couldn't generate a response.";
+        const data = await response.json();
+        const botResponse =
+          data.choices && data.choices[0] && data.choices[0].message
+            ? data.choices[0].message.content
+            : "I'm sorry, I couldn't generate a response.";
 
-      const ttsResponse = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: botResponse }),
-        signal: abortControllerRef.current.signal,
-      });
+        const ttsResponse = await fetch("/api/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: botResponse }),
+          signal: abortControllerRef.current.signal,
+        });
 
-      const ttsData = await ttsResponse.json();
-      const audioContent = atob(ttsData.audioContent);
-      const audioArray = new Uint8Array(audioContent.length);
-      for (let i = 0; i < audioContent.length; i++) {
-        audioArray[i] = audioContent.charCodeAt(i);
+        const ttsData = await ttsResponse.json();
+        const audioContent = atob(ttsData.audioContent);
+        const audioArray = new Uint8Array(audioContent.length);
+        for (let i = 0; i < audioContent.length; i++) {
+          audioArray[i] = audioContent.charCodeAt(i);
+        }
+
+        const audioBlob = new Blob([audioArray], { type: "audio/mp3" });
+        const audioUrl = URL.createObjectURL(audioBlob);
+
+        setMessages((prev) => {
+          const newMessages = [...prev];
+          newMessages.pop(); // Remove the loading message
+          newMessages.push({ text: botResponse, isUser: false, audioUrl });
+          return newMessages;
+        });
+
+        setCurrentAudioUrl(audioUrl);
+
+        // Play the audio automatically
+        if (audioRef.current) {
+          audioRef.current.src = audioUrl;
+          audioRef.current.play();
+          setIsPlaying(true);
+        }
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name === "AbortError") {
+          setMessages((prev) => prev.slice(0, -1)); // Remove the loading message
+        } else {
+          console.error("Error in handleSendMessage:", error);
+        }
+      } finally {
+        setIsLoading(false);
+        setIsCancelling(false);
+        abortControllerRef.current = null;
       }
+    },
+    [messages]
+  );
 
-      const audioBlob = new Blob([audioArray], { type: "audio/mp3" });
-      const audioUrl = URL.createObjectURL(audioBlob);
-
-      setMessages((prev) => {
-        const newMessages = [...prev];
-        newMessages.pop(); // Remove the loading message
-        newMessages.push({ text: botResponse, isUser: false, audioUrl });
-        return newMessages;
-      });
-
-      setCurrentAudioUrl(audioUrl);
-
-      // Play the audio automatically
-      if (audioRef.current) {
-        audioRef.current.src = audioUrl;
-        audioRef.current.play();
-        setIsPlaying(true);
-      }
-    } catch (error: unknown) {
-      if (error instanceof Error && error.name === "AbortError") {
-        setMessages((prev) => prev.slice(0, -1)); // Remove the loading message
-      } else {
-        console.error("Error in handleSendMessage:", error);
-      }
-    } finally {
-      setIsLoading(false);
-      setIsCancelling(false);
-      abortControllerRef.current = null;
-    }
-  };
-
-  const handleCancelMessage = () => {
+  const handleCancelMessage = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
     setIsCancelling(false);
     setIsLoading(false);
-  };
+  }, []);
 
-  const handleRecordAudio = async () => {
+  const handleRecordAudio = useCallback(async () => {
     if (audioRef.current && !audioRef.current.paused) {
       audioRef.current.pause();
       setIsPlaying(false);
@@ -178,9 +181,9 @@ export default function Home() {
         console.error("Error accessing microphone:", error);
       }
     }
-  };
+  }, [isRecording, handleSendMessage]);
 
-  const handlePlayPause = () => {
+  const handlePlayPause = useCallback(() => {
     if (audioRef.current && currentAudioUrl) {
       if (audioRef.current.paused) {
         audioRef.current.src = currentAudioUrl;
@@ -192,7 +195,37 @@ export default function Home() {
         setIsPlaying(false);
       }
     }
-  };
+  }, [currentAudioUrl]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Enter") {
+        if (e.metaKey) {
+          // Command + Enter for recording
+          handleRecordAudio();
+        } else if (e.altKey) {
+          // Alt + Enter for play/pause
+          handlePlayPause();
+        } else if (!e.ctrlKey && !e.altKey && !e.shiftKey && inputText.trim()) {
+          // Enter (without modifiers) for sending message
+          handleSendMessage(inputText);
+        }
+      } else if (e.key === "Escape" && isLoading) {
+        // Escape for cancelling message
+        handleCancelMessage();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    handlePlayPause,
+    handleRecordAudio,
+    handleSendMessage,
+    handleCancelMessage,
+    inputText,
+    isLoading,
+  ]);
 
   return (
     <div className="flex flex-col h-screen bg-black">
@@ -249,6 +282,7 @@ export default function Home() {
                 : "bg-gray-500 cursor-not-allowed"
             } text-white`}
             disabled={isLoading}
+            title="Record (⌘+Return)"
           >
             {isRecording ? <MicOff size={20} /> : <Mic size={20} />}
           </button>
@@ -260,6 +294,7 @@ export default function Home() {
                 : "bg-gray-500 cursor-not-allowed"
             } text-white`}
             disabled={!currentAudioUrl || isLoading || isRecording}
+            title={isPlaying ? "Pause (⌥+Return)" : "Play (⌥+Return)"}
           >
             {isPlaying ? <Pause size={20} /> : <Play size={20} />}
           </button>
@@ -285,6 +320,7 @@ export default function Home() {
             disabled={!inputText.trim() && !isLoading && !isRecording}
             onMouseEnter={() => isLoading && setIsCancelling(true)}
             onMouseLeave={() => isLoading && setIsCancelling(false)}
+            title={isCancelling ? "Abort (Esc)" : "Send (Return)"}
           >
             {isLoading ? (
               isCancelling ? (

@@ -61,10 +61,18 @@ export default function Home() {
     abortControllerRef.current = new AbortController();
 
     try {
+      const conversationHistory = messages.map((message) => ({
+        role: message.isUser ? "user" : "assistant",
+        content: message.text,
+      }));
+
       const response = await fetch("/api/gpt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({
+          text,
+          conversationHistory,
+        }),
         signal: abortControllerRef.current.signal,
       });
 

@@ -1,7 +1,17 @@
 "use client";
 import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
-import { Mic, MicOff, Send, Play, Pause, Loader, X } from "lucide-react";
+import {
+  Mic,
+  MicOff,
+  Send,
+  Play,
+  Pause,
+  Loader,
+  X,
+  Trash2,
+  Settings,
+} from "lucide-react";
 
 type Message = {
   text: string;
@@ -197,6 +207,33 @@ export default function Home() {
     }
   }, [currentAudioUrl]);
 
+  const handleClearChat = useCallback(() => {
+    // Stop any ongoing processes
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+    }
+
+    // Clear all states
+    setMessages([]);
+    setInputText("");
+    setIsRecording(false);
+    setIsPlaying(false);
+    setCurrentAudioUrl(null);
+    setIsLoading(false);
+    setIsCancelling(false);
+
+    // Clear audio
+    if (audioRef.current) {
+      audioRef.current.src = "";
+    }
+  }, [isRecording]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Enter") {
@@ -229,16 +266,33 @@ export default function Home() {
 
   return (
     <div className="flex flex-col h-screen bg-black">
-      <header className="flex items-center gap-1 p-4 bg-black text-white border-b border-white">
-        <Image
-          className="w-20 h-auto mt-1"
-          src="https://rime.ai/_nuxt/RimeSpeechTech_Logo.2582e20f.svg"
-          alt="Rime logo"
-          width={90}
-          height={19}
-          priority
-        />
-        <span className="text-2xl font-black">chat</span>
+      <header className="flex items-center justify-between p-4 bg-black text-white border-b border-white">
+        <div className="flex items-center gap-1">
+          <Image
+            className="w-20 h-auto mt-1"
+            src="https://rime.ai/_nuxt/RimeSpeechTech_Logo.2582e20f.svg"
+            alt="Rime logo"
+            width={90}
+            height={19}
+            priority
+          />
+          <span className="text-2xl font-black">chat</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleClearChat}
+            className="p-2 rounded-full bg-gray-700 text-white hover:bg-gray-600 transition-colors duration-200"
+            title="Clear Chat"
+          >
+            <Trash2 size={20} />
+          </button>
+          <button
+            className="p-2 rounded-full bg-gray-700 text-white hover:bg-gray-600 transition-colors duration-200"
+            title="Settings"
+          >
+            <Settings size={20} />
+          </button>
+        </div>
       </header>
       <div
         ref={chatContainerRef}
@@ -276,9 +330,9 @@ export default function Home() {
             onClick={handleRecordAudio}
             className={`p-2 rounded-full ${
               isRecording
-                ? "bg-red-500"
+                ? "bg-red-500 hover:bg-red-400 transition-colors duration-200"
                 : !isLoading
-                ? "bg-gray-700"
+                ? "bg-gray-700 hover:bg-gray-600 transition-colors duration-200"
                 : "bg-gray-500 cursor-not-allowed"
             } text-white`}
             disabled={isLoading}
@@ -290,7 +344,7 @@ export default function Home() {
             onClick={handlePlayPause}
             className={`p-2 rounded-full ${
               currentAudioUrl && !isLoading && !isRecording
-                ? "bg-gray-700"
+                ? "bg-gray-700 hover:bg-gray-600 transition-colors duration-200"
                 : "bg-gray-500 cursor-not-allowed"
             } text-white`}
             disabled={!currentAudioUrl || isLoading || isRecording}
@@ -311,10 +365,10 @@ export default function Home() {
             className={`p-2 rounded-full ${
               isLoading
                 ? isCancelling
-                  ? "bg-red-500"
-                  : "bg-blue-500"
+                  ? "bg-red-500 hover:bg-red-400 transition-colors duration-200"
+                  : "bg-blue-500 hover:bg-blue-400 transition-colors duration-200"
                 : isRecording || inputText.trim()
-                ? "bg-blue-500"
+                ? "bg-blue-500 hover:bg-blue-400 transition-colors duration-200"
                 : "bg-gray-500 cursor-not-allowed"
             } text-white`}
             disabled={!inputText.trim() && !isLoading && !isRecording}

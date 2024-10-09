@@ -1,25 +1,55 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
+import { Mic, Send, Play, Pause } from "lucide-react";
+
+type Message = {
+  text: string;
+  isUser: boolean;
+  audioUrl?: string;
+};
 
 export default function Home() {
-  const [text, setText] = useState("");
-  const [audioUrl, setAudioUrl] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputText, setInputText] = useState("");
   const [isRecording, setIsRecording] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const handlePlayAudio = async () => {
-    const response = await fetch("/api/tts", {
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop =
+        chatContainerRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const handleSendMessage = async (text: string) => {
+    setMessages((prev) => [...prev, { text, isUser: true }]);
+    setInputText("");
+
+    const response = await fetch("/api/gpt", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
     });
 
     const data = await response.json();
+    const botResponse =
+      data.choices && data.choices[0] && data.choices[0].message
+        ? data.choices[0].message.content
+        : "I'm sorry, I couldn't generate a response.";
 
-    const audioContent = atob(data.audioContent);
+    const ttsResponse = await fetch("/api/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: botResponse }),
+    });
+
+    const ttsData = await ttsResponse.json();
+    const audioContent = atob(ttsData.audioContent);
     const audioArray = new Uint8Array(audioContent.length);
     for (let i = 0; i < audioContent.length; i++) {
       audioArray[i] = audioContent.charCodeAt(i);
@@ -27,20 +57,20 @@ export default function Home() {
 
     const audioBlob = new Blob([audioArray], { type: "audio/mp3" });
     const audioUrl = URL.createObjectURL(audioBlob);
-    setAudioUrl(audioUrl);
-  };
 
-  const handleGenerateRandomText = async () => {
-    const response = await fetch("/api/gpt", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ text: "Generate a random paragraph." }),
-    });
+    setMessages((prev) => [
+      ...prev,
+      { text: botResponse, isUser: false, audioUrl },
+    ]);
 
-    const data = await response.json();
-    setText(data.choices[0].message.content);
+    setCurrentAudioUrl(audioUrl);
+
+    // Play the audio automatically
+    if (audioRef.current) {
+      audioRef.current.src = audioUrl;
+      audioRef.current.play();
+      setIsPlaying(true);
+    }
   };
 
   const handleRecordAudio = async () => {
@@ -62,7 +92,6 @@ export default function Home() {
 
         mediaRecorder.onstop = async () => {
           const audioBlob = new Blob(audioChunks);
-
           const formData = new FormData();
           formData.append("audio", audioBlob, "audio.webm");
 
@@ -72,7 +101,7 @@ export default function Home() {
           });
 
           const data = await response.json();
-          setText(data.text);
+          handleSendMessage(data.text);
         };
 
         mediaRecorder.start();
@@ -83,54 +112,92 @@ export default function Home() {
     }
   };
 
+  const handlePlayPause = () => {
+    if (audioRef.current && currentAudioUrl) {
+      if (audioRef.current.paused) {
+        audioRef.current.src = currentAudioUrl;
+        audioRef.current.play();
+        setIsPlaying(true);
+      } else {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        setIsPlaying(false);
+      }
+    }
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
+    <div className="flex flex-col h-screen bg-black">
+      <header className="flex items-center gap-1 p-4 bg-black text-white border-b border-white">
         <Image
-          className="w-40 h-auto"
+          className="w-20 h-auto mt-1"
           src="https://rime.ai/_nuxt/RimeSpeechTech_Logo.2582e20f.svg"
           alt="Rime logo"
-          width={180}
-          height={38}
+          width={90}
+          height={19}
           priority
         />
-        <div className="flex flex-col gap-4 items-center sm:items-start">
-          <textarea
-            className="border border-gray-300 text-black rounded p-2 w-full"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Enter text here"
-            rows={4}
-          />
-          <div className="flex gap-4">
-            <button
-              className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-              onClick={handlePlayAudio}
-            >
-              Play Audio
-            </button>
-            <button
-              className="rounded-full border border-solid border-foreground transition-colors flex items-center justify-center bg-transparent text-foreground gap-2 hover:bg-[#f0f0f0] dark:hover:bg-[#333] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-              onClick={handleGenerateRandomText}
-            >
-              Generate Random Text
-            </button>
-            <button
-              className={`rounded-full border border-solid border-foreground transition-colors flex items-center justify-center bg-transparent text-foreground gap-2 hover:bg-[#f0f0f0] dark:hover:bg-[#333] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 ${
-                isRecording ? "bg-red-500 text-white" : ""
+        <span className="text-2xl font-black">chat</span>
+      </header>
+      <div
+        ref={chatContainerRef}
+        className="flex-1 overflow-y-auto p-4 space-y-4 bg-black"
+      >
+        {messages.map((message, index) => (
+          <div
+            key={index}
+            className={`flex ${
+              message.isUser ? "justify-end" : "justify-start"
+            }`}
+          >
+            <div
+              className={`max-w-[70%] p-3 rounded-lg ${
+                message.isUser
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-800 text-white"
               }`}
-              onClick={handleRecordAudio}
             >
-              {isRecording ? "Stop Recording" : "Record Audio"}
-            </button>
+              <span>{message.text}</span>
+            </div>
           </div>
-          {audioUrl && (
-            <audio controls src={audioUrl} className="mt-4" autoPlay>
-              Your browser does not support the audio element.
-            </audio>
-          )}
+        ))}
+      </div>
+      <div className="p-4 bg-black text-white border-t border-white">
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            placeholder="Type a message..."
+            className="flex-1 p-2 rounded border border-gray-300 bg-gray-800 text-white"
+          />
+          <button
+            onClick={handleRecordAudio}
+            className={`p-2 rounded-full ${
+              isRecording ? "bg-red-500 text-white" : "bg-gray-700 text-white"
+            }`}
+          >
+            <Mic size={20} />
+          </button>
+          <button
+            onClick={handlePlayPause}
+            className={`p-2 rounded-full ${
+              currentAudioUrl ? "bg-gray-700" : "bg-gray-500 cursor-not-allowed"
+            } text-white`}
+            disabled={!currentAudioUrl}
+          >
+            {isPlaying ? <Pause size={20} /> : <Play size={20} />}
+          </button>
+          <button
+            onClick={() => handleSendMessage(inputText)}
+            className="p-2 rounded-full bg-blue-500 text-white"
+            disabled={!inputText.trim()}
+          >
+            <Send size={20} />
+          </button>
         </div>
-      </main>
+      </div>
+      <audio ref={audioRef} onEnded={() => setIsPlaying(false)} />
     </div>
   );
 }

@@ -49,7 +49,7 @@ async function handler() {
       };
     })
     // Alphabetically sort by name
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a: Voice, b: Voice) => a.name.localeCompare(b.name));
 
   return NextResponse.json({
     voices: mistVoicesWithDetails,

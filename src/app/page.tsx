@@ -494,18 +494,26 @@ export default function Home() {
                 {voices
                   .filter((voice) => {
                     if (!searchTerm.trim()) return true;
-                    const searchTerms = searchTerm.toLowerCase().split(/\s+/);
+                    const searchTerms =
+                      searchTerm.match(/("[^"]*"|\S+)/g) || [];
                     return searchTerms.every((term) => {
+                      const cleanTerm = term
+                        .replace(/^"|"$/g, "")
+                        .toLowerCase();
+                      const isQuoted =
+                        term.startsWith('"') && term.endsWith('"');
+                      const matchWord = (str: string) =>
+                        isQuoted
+                          ? str.toLowerCase() === cleanTerm
+                          : str.toLowerCase().includes(cleanTerm);
                       return (
-                        voice.name.toLowerCase().includes(term) ||
-                        voice.gender.toLowerCase().includes(term) ||
-                        voice.age.toLowerCase().includes(term) ||
-                        voice.country.toLowerCase().includes(term) ||
-                        voice.region.toLowerCase().includes(term) ||
-                        voice.demographic.toLowerCase().includes(term) ||
-                        voice.genre.some((genre) =>
-                          genre.toLowerCase().includes(term)
-                        )
+                        matchWord(voice.name) ||
+                        matchWord(voice.gender) ||
+                        matchWord(voice.age) ||
+                        matchWord(voice.country) ||
+                        matchWord(voice.region) ||
+                        matchWord(voice.demographic) ||
+                        voice.genre.some(matchWord)
                       );
                     });
                   })

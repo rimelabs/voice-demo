@@ -13,6 +13,7 @@ import {
   Settings,
   Pencil,
   Check,
+  Keyboard,
 } from "lucide-react";
 
 type Message = {
@@ -31,6 +32,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isEditingVoice, setIsEditingVoice] = useState(false);
   const [editingVoiceName, setEditingVoiceName] = useState("");
   const [voices, setVoices] = useState<
@@ -229,12 +231,13 @@ export default function Home() {
   const handlePlayPause = useCallback(() => {
     if (audioRef.current && currentAudioUrl) {
       if (audioRef.current.paused) {
-        audioRef.current.src = currentAudioUrl;
+        if (!audioRef.current.src) {
+          audioRef.current.src = currentAudioUrl;
+        }
         audioRef.current.play();
         setIsPlaying(true);
       } else {
         audioRef.current.pause();
-        audioRef.current.currentTime = 0;
         setIsPlaying(false);
       }
     }
@@ -280,9 +283,25 @@ export default function Home() {
           // Enter (without modifiers) for sending message
           handleSendMessage(inputText);
         }
-      } else if (e.key === "Escape" && isLoading) {
+      } else if (e.key === "Escape") {
         // Escape for cancelling message
-        handleCancelMessage();
+        if (isLoading) {
+          handleCancelMessage();
+        }
+        // Escape for restarting audio
+        if (isPlaying) {
+          handlePlayPause();
+        }
+        if (audioRef.current) {
+          audioRef.current.currentTime = 0;
+        }
+        // Escape for closing menu
+        if (isSettingsOpen) {
+          setIsSettingsOpen(false);
+        }
+        if (isHelpOpen) {
+          setIsHelpOpen(false);
+        }
       }
     };
 
@@ -295,6 +314,9 @@ export default function Home() {
     handleCancelMessage,
     inputText,
     isLoading,
+    isPlaying,
+    isSettingsOpen,
+    isHelpOpen,
   ]);
 
   const handleSettingsClick = () => {
@@ -304,6 +326,14 @@ export default function Home() {
   const handleCloseSettings = () => {
     setSearchTerm("");
     setIsSettingsOpen(false);
+  };
+
+  const handleHelpClick = () => {
+    setIsHelpOpen(true);
+  };
+
+  const handleCloseHelp = () => {
+    setIsHelpOpen(false);
   };
 
   return (
@@ -327,6 +357,13 @@ export default function Home() {
             title="Clear Chat"
           >
             <Trash2 size={20} />
+          </button>
+          <button
+            onClick={handleHelpClick}
+            className="p-2 rounded-full bg-gray-700 text-white hover:bg-gray-600 transition-colors duration-200"
+            title="Help"
+          >
+            <Keyboard size={20} />
           </button>
           <button
             onClick={handleSettingsClick}
@@ -379,7 +416,7 @@ export default function Home() {
                 : "bg-gray-500 cursor-not-allowed"
             } text-white`}
             disabled={isLoading}
-            title="Record (⌘+Return)"
+            title="Record (⌘+Enter)"
           >
             {isRecording ? <MicOff size={20} /> : <Mic size={20} />}
           </button>
@@ -391,7 +428,7 @@ export default function Home() {
                 : "bg-gray-500 cursor-not-allowed"
             } text-white`}
             disabled={!currentAudioUrl || isLoading || isRecording}
-            title={isPlaying ? "Pause (⌥+Return)" : "Play (⌥+Return)"}
+            title={isPlaying ? "Pause (⌥+Enter)" : "Play (⌥+Enter)"}
           >
             {isPlaying ? <Pause size={20} /> : <Play size={20} />}
           </button>
@@ -417,7 +454,7 @@ export default function Home() {
             disabled={!inputText.trim() && !isLoading && !isRecording}
             onMouseEnter={() => isLoading && setIsCancelling(true)}
             onMouseLeave={() => isLoading && setIsCancelling(false)}
-            title={isCancelling ? "Abort (Esc)" : "Send (Return)"}
+            title={isCancelling ? "Abort (Esc)" : "Send (Enter)"}
           >
             {isLoading ? (
               isCancelling ? (
@@ -580,6 +617,40 @@ export default function Home() {
                   ))}
               </ul>
             </div>
+          </div>
+        </div>
+      )}
+      {isHelpOpen && (
+        <div
+          className="fixed inset-0 bg-white bg-opacity-70 flex items-center justify-center z-50"
+          onClick={handleCloseHelp}
+        >
+          <div
+            className="w-5/6 md:w-3/6 bg-black border border-white rounded-lg p-6 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={handleCloseHelp}
+              className="absolute top-2 right-2 text-white hover:text-gray-300"
+            >
+              <X size={20} />
+            </button>
+            <h2 className="text-white text-xl mb-4">Keyboard Shortcuts</h2>
+            <ul className="text-white space-y-2">
+              <li>
+                <strong>Enter:</strong> Send message
+              </li>
+              <li>
+                <strong>⌘ + Enter:</strong> Start/stop and send recording
+              </li>
+              <li>
+                <strong>⌥ + Enter:</strong> Play/pause response audio
+              </li>
+              <li>
+                <strong>Escape:</strong> Cancel response, restart audio, or
+                close menu
+              </li>
+            </ul>
           </div>
         </div>
       )}

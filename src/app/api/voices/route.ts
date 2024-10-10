@@ -1,5 +1,15 @@
 import { NextResponse } from "next/server";
 
+type Voice = {
+  name: string;
+  gender: string;
+  age: string;
+  country: string;
+  region: string;
+  demographic: string;
+  genre: string[];
+};
+
 async function handler() {
   const [allVoicesResponse, voiceDetailsResponse] = await Promise.all([
     fetch("https://users.rime.ai/data/voices/all.json", {
@@ -23,9 +33,9 @@ async function handler() {
 
   const mistVoices = allVoices.mist || [];
   const mistVoicesWithDetails = mistVoices
-    .map((speakerId) => {
+    .map((speakerId: string) => {
       const details = voiceDetails.find(
-        (voice) => voice.name.toLowerCase() === speakerId.toLowerCase()
+        (voice: Voice) => voice.name.toLowerCase() === speakerId.toLowerCase()
       );
       return {
         speaker_id: speakerId,

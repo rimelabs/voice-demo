@@ -59,7 +59,6 @@ export default function Home() {
         const response = await fetch("/api/voices");
         const data = await response.json();
         setVoices(data.voices);
-        console.log("Voices fetched:", data.voices);
       } catch (error) {
         console.error("Error fetching voices:", error);
       }
@@ -270,6 +269,16 @@ export default function Home() {
     }
   }, [isRecording]);
 
+  const handleSettingsClick = useCallback(() => {
+    setIsHelpOpen(false);
+    setIsSettingsOpen((prev) => !prev);
+  }, []);
+
+  const handleHelpClick = useCallback(() => {
+    setIsSettingsOpen(false);
+    setIsHelpOpen((prev) => !prev);
+  }, []);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Enter") {
@@ -302,6 +311,17 @@ export default function Home() {
         if (isHelpOpen) {
           setIsHelpOpen(false);
         }
+      } else if (e.ctrlKey) {
+        if (e.key === "d") {
+          e.preventDefault();
+          handleClearChat();
+        } else if (e.key === "k") {
+          e.preventDefault();
+          handleHelpClick();
+        } else if (e.key === "s") {
+          e.preventDefault();
+          handleSettingsClick();
+        }
       }
     };
 
@@ -312,6 +332,9 @@ export default function Home() {
     handleRecordAudio,
     handleSendMessage,
     handleCancelMessage,
+    handleClearChat,
+    handleHelpClick,
+    handleSettingsClick,
     inputText,
     isLoading,
     isPlaying,
@@ -319,22 +342,14 @@ export default function Home() {
     isHelpOpen,
   ]);
 
-  const handleSettingsClick = () => {
-    setIsSettingsOpen(true);
-  };
-
-  const handleCloseSettings = () => {
+  const handleCloseSettings = useCallback(() => {
     setSearchTerm("");
     setIsSettingsOpen(false);
-  };
+  }, []);
 
-  const handleHelpClick = () => {
-    setIsHelpOpen(true);
-  };
-
-  const handleCloseHelp = () => {
+  const handleCloseHelp = useCallback(() => {
     setIsHelpOpen(false);
-  };
+  }, []);
 
   return (
     <div className="flex flex-col h-screen bg-black">
@@ -354,21 +369,21 @@ export default function Home() {
           <button
             onClick={handleClearChat}
             className="p-2 rounded-full bg-gray-700 text-white hover:bg-gray-600 transition-colors duration-200"
-            title="Clear Chat"
+            title="Clear Chat (^+D)"
           >
             <Trash2 size={20} />
           </button>
           <button
             onClick={handleHelpClick}
             className="p-2 rounded-full bg-gray-700 text-white hover:bg-gray-600 transition-colors duration-200"
-            title="Help"
+            title="Keyboard Shortcuts (^+K)"
           >
             <Keyboard size={20} />
           </button>
           <button
             onClick={handleSettingsClick}
             className="p-2 rounded-full bg-gray-700 text-white hover:bg-gray-600 transition-colors duration-200"
-            title="Settings"
+            title="Settings (^+S)"
           >
             <Settings size={20} />
           </button>
@@ -645,6 +660,15 @@ export default function Home() {
               </li>
               <li>
                 <strong>⌥ + Enter:</strong> Play/pause response audio
+              </li>
+              <li>
+                <strong>⌃ + D:</strong> Clear chat
+              </li>
+              <li>
+                <strong>⌃ + K:</strong> Toggle keyboard shortcuts
+              </li>
+              <li>
+                <strong>⌃ + S:</strong> Toggle settings
               </li>
               <li>
                 <strong>Escape:</strong> Cancel response, restart audio, or

@@ -28,10 +28,39 @@ export default function Home() {
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [voices, setVoices] = useState<
+    Array<{
+      name: string;
+      gender: string;
+      age: string;
+      country: string;
+      region: string;
+      demographic: string;
+      genre: string[];
+    }>
+  >([]);
+  const [selectedVoice, setSelectedVoice] = useState("lagoon");
+  const [searchTerm, setSearchTerm] = useState("");
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    const fetchVoices = async () => {
+      try {
+        const response = await fetch("/api/voices");
+        const data = await response.json();
+        setVoices(data.voices);
+        console.log("Voices fetched:", data.voices);
+      } catch (error) {
+        console.error("Error fetching voices:", error);
+      }
+    };
+
+    fetchVoices();
+  }, []);
 
   useEffect(() => {
     if (chatContainerRef.current) {
@@ -96,7 +125,7 @@ export default function Home() {
         const ttsResponse = await fetch("/api/tts", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: botResponse }),
+          body: JSON.stringify({ text: botResponse, speaker: selectedVoice }),
           signal: abortControllerRef.current.signal,
         });
 
@@ -137,7 +166,7 @@ export default function Home() {
         abortControllerRef.current = null;
       }
     },
-    [messages]
+    [messages, selectedVoice]
   );
 
   const handleCancelMessage = useCallback(() => {
@@ -264,6 +293,15 @@ export default function Home() {
     isLoading,
   ]);
 
+  const handleSettingsClick = () => {
+    setIsSettingsOpen(true);
+  };
+
+  const handleCloseSettings = () => {
+    setSearchTerm("");
+    setIsSettingsOpen(false);
+  };
+
   return (
     <div className="flex flex-col h-screen bg-black">
       <header className="flex items-center justify-between p-4 bg-black text-white border-b border-white">
@@ -287,6 +325,7 @@ export default function Home() {
             <Trash2 size={20} />
           </button>
           <button
+            onClick={handleSettingsClick}
             className="p-2 rounded-full bg-gray-700 text-white hover:bg-gray-600 transition-colors duration-200"
             title="Settings"
           >
@@ -389,6 +428,115 @@ export default function Home() {
         </div>
       </div>
       <audio ref={audioRef} onEnded={() => setIsPlaying(false)} />
+      {isSettingsOpen && (
+        <div
+          className="fixed inset-0 bg-white bg-opacity-70 flex items-center justify-center z-50"
+          onClick={handleCloseSettings}
+        >
+          <div
+            className="w-5/6 md:w-3/6 h-4/6 bg-black border border-white rounded-lg p-6 relative overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={handleCloseSettings}
+              className="absolute top-2 right-2 text-white hover:text-gray-300"
+            >
+              <X size={20} />
+            </button>
+            <h2 className="text-white text-xl mb-4">Settings</h2>
+            <div className="text-white">
+              <h3 className="text-lg mb-2">Selected Voice: {selectedVoice}</h3>
+              <input
+                type="text"
+                placeholder="Search voices..."
+                className="w-full p-2 my-4 bg-gray-700 text-white rounded"
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <ul className="max-h-96 overflow-y-auto">
+                {voices
+                  .filter((voice) => {
+                    if (!searchTerm.trim()) return true;
+                    const searchTerms = searchTerm.toLowerCase().split(/\s+/);
+                    return searchTerms.every((term) => {
+                      return (
+                        voice.name.toLowerCase().includes(term) ||
+                        voice.gender.toLowerCase().includes(term) ||
+                        voice.age.toLowerCase().includes(term) ||
+                        voice.country.toLowerCase().includes(term) ||
+                        voice.region.toLowerCase().includes(term) ||
+                        voice.demographic.toLowerCase().includes(term) ||
+                        voice.genre.some((genre) =>
+                          genre.toLowerCase().includes(term)
+                        )
+                      );
+                    });
+                  })
+                  .map((voice) => (
+                    <li
+                      key={voice.name}
+                      className={`border-y border-gray-700 p-2 transition-colors duration-200 ${
+                        selectedVoice === voice.name
+                          ? "bg-blue-500"
+                          : "hover:bg-gray-700"
+                      } ${
+                        // Only apply cursor-pointer on small screens
+                        "md:cursor-default cursor-pointer"
+                      }`}
+                      onClick={() => {
+                        // Only allow click on small screens
+                        if (window.innerWidth < 768) {
+                          setSelectedVoice(voice.name);
+                          handleCloseSettings();
+                        }
+                      }}
+                    >
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p>
+                            <strong>Name:</strong> {voice.name}
+                          </p>
+                          <p>
+                            <strong>Gender:</strong> {voice.gender}
+                          </p>
+                          <p>
+                            <strong>Age:</strong> {voice.age}
+                          </p>
+                          <p>
+                            <strong>Country:</strong> {voice.country}
+                          </p>
+                          <p>
+                            <strong>Region:</strong> {voice.region}
+                          </p>
+                          <p>
+                            <strong>Demographic:</strong> {voice.demographic}
+                          </p>
+                          <p>
+                            <strong>Genres:</strong> {voice.genre.join(", ")}
+                          </p>
+                        </div>
+                        <button
+                          className={`hidden md:block px-4 py-2 text-white rounded transition-colors duration-200 ${
+                            selectedVoice === voice.name
+                              ? "bg-blue-600"
+                              : "bg-blue-500 hover:bg-blue-600"
+                          }`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedVoice(voice.name);
+                            handleCloseSettings();
+                          }}
+                          disabled={selectedVoice === voice.name}
+                        >
+                          {selectedVoice === voice.name ? "Selected" : "Select"}
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

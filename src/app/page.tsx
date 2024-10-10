@@ -11,6 +11,8 @@ import {
   X,
   Trash2,
   Settings,
+  Pencil,
+  Check,
 } from "lucide-react";
 
 type Message = {
@@ -29,6 +31,8 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isEditingVoice, setIsEditingVoice] = useState(false);
+  const [editingVoiceName, setEditingVoiceName] = useState("");
   const [voices, setVoices] = useState<
     Array<{
       name: string;
@@ -445,7 +449,41 @@ export default function Home() {
             </button>
             <h2 className="text-white text-xl mb-4">Settings</h2>
             <div className="text-white">
-              <h3 className="text-lg mb-2">Selected Voice: {selectedVoice}</h3>
+              <h3 className="text-lg mb-2 flex items-center">
+                Selected Voice:
+                {isEditingVoice ? (
+                  <>
+                    <input
+                      type="text"
+                      value={editingVoiceName}
+                      onChange={(e) => setEditingVoiceName(e.target.value)}
+                      className="ml-2 p-1 bg-gray-700 text-white rounded"
+                    />
+                    <button
+                      onClick={() => {
+                        setSelectedVoice(editingVoiceName);
+                        setIsEditingVoice(false);
+                      }}
+                      className="ml-2 text-white hover:text-gray-300"
+                    >
+                      <Check size={20} />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="ml-2">{selectedVoice}</span>
+                    <button
+                      onClick={() => {
+                        setIsEditingVoice(true);
+                        setEditingVoiceName(selectedVoice);
+                      }}
+                      className="ml-2 text-white hover:text-gray-300"
+                    >
+                      <Pencil size={20} />
+                    </button>
+                  </>
+                )}
+              </h3>
               <input
                 type="text"
                 placeholder="Search voices..."

@@ -38,6 +38,7 @@ export default function Home() {
   const [voices, setVoices] = useState<
     Array<{
       name: string;
+      model_id: string;
       gender: string;
       age: string;
       country: string;
@@ -47,6 +48,7 @@ export default function Home() {
     }>
   >([]);
   const [selectedVoice, setSelectedVoice] = useState("lagoon");
+  const [selectedModelId, setSelectedModelId] = useState("mist");
   const [searchTerm, setSearchTerm] = useState("");
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -111,7 +113,7 @@ export default function Home() {
           content: message.text,
         }));
 
-        const response = await fetch("/api/gpt", {
+        const response = await fetch("/api/llm", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -130,7 +132,11 @@ export default function Home() {
         const ttsResponse = await fetch("/api/tts", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: botResponse, speaker: selectedVoice }),
+          body: JSON.stringify({ 
+            text: botResponse, 
+            speaker: selectedVoice,
+            modelId: selectedModelId
+          }),
           signal: abortControllerRef.current.signal,
         });
 
@@ -171,7 +177,7 @@ export default function Home() {
         abortControllerRef.current = null;
       }
     },
-    [messages, selectedVoice]
+    [messages, selectedVoice, voices, selectedModelId]
   );
 
   const handleCancelMessage = useCallback(() => {
@@ -354,16 +360,16 @@ export default function Home() {
   return (
     <div className="flex flex-col h-screen bg-black">
       <header className="flex items-center justify-between p-4 bg-black text-white border-b border-white">
-        <div className="flex items-center gap-1">
+        <div className="flex items-center">
           <Image
-            className="w-20 h-auto mt-1"
-            src="https://rime.ai/_nuxt/RimeSpeechTech_Logo.2582e20f.svg"
+            className="h-8 w-auto mt-1"
+            src="/rime-logo.svg"
             alt="Rime logo"
-            width={90}
-            height={19}
+            width={120}
+            height={38}
             priority
           />
-          <span className="text-2xl font-black">chat</span>
+          <span className="text-[29px] font-extrabold -mt-[2px]">.chat</span>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -560,6 +566,7 @@ export default function Home() {
                           : str.toLowerCase().includes(cleanTerm);
                       return (
                         matchWord(voice.name) ||
+                        matchWord(voice.model_id) ||
                         matchWord(voice.gender) ||
                         matchWord(voice.age) ||
                         matchWord(voice.country) ||
@@ -569,11 +576,18 @@ export default function Home() {
                       );
                     });
                   })
+                  .sort((a, b) => {
+                    // Prioritize mistv2 before mist
+                    if (a.model_id === "mistv2" && b.model_id === "mist") return -1;
+                    if (a.model_id === "mist" && b.model_id === "mistv2") return 1;
+                    // Then sort alphabetically by name
+                    return a.name.localeCompare(b.name);
+                  })
                   .map((voice) => (
                     <li
-                      key={voice.name}
+                      key={`${voice.name}-${voice.model_id}`}
                       className={`border-y border-gray-700 p-2 transition-colors duration-200 ${
-                        selectedVoice === voice.name
+                        selectedVoice === voice.name && selectedModelId === voice.model_id
                           ? "bg-blue-500"
                           : "hover:bg-gray-700"
                       } ${
@@ -584,6 +598,7 @@ export default function Home() {
                         // Only allow click on small screens
                         if (window.innerWidth < 768) {
                           setSelectedVoice(voice.name);
+                          setSelectedModelId(voice.model_id);
                           handleCloseSettings();
                         }
                       }}
@@ -592,6 +607,9 @@ export default function Home() {
                         <div>
                           <p>
                             <strong>Name:</strong> {voice.name}
+                          </p>
+                          <p>
+                            <strong>Model ID:</strong> {voice.model_id}
                           </p>
                           <p>
                             <strong>Gender:</strong> {voice.gender}
@@ -614,18 +632,19 @@ export default function Home() {
                         </div>
                         <button
                           className={`hidden md:block px-4 py-2 text-white rounded transition-colors duration-200 ${
-                            selectedVoice === voice.name
+                            selectedVoice === voice.name && selectedModelId === voice.model_id
                               ? "bg-blue-600"
                               : "bg-blue-500 hover:bg-blue-600"
                           }`}
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedVoice(voice.name);
+                            setSelectedModelId(voice.model_id);
                             handleCloseSettings();
                           }}
-                          disabled={selectedVoice === voice.name}
+                          disabled={selectedVoice === voice.name && selectedModelId === voice.model_id}
                         >
-                          {selectedVoice === voice.name ? "Selected" : "Select"}
+                          {selectedVoice === voice.name && selectedModelId === voice.model_id ? "Selected" : "Select"}
                         </button>
                       </div>
                     </li>

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 async function handler(request: NextRequest) {
-  const { text, speaker } = await request.json();
+  const { text, speaker, modelId } = await request.json();
 
   const response = await fetch("https://users.rime.ai/v1/rime-tts", {
     method: "POST",
@@ -11,9 +11,9 @@ async function handler(request: NextRequest) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      speaker: speaker || "lagoon",
+      speaker: speaker || "Abbie",
       text: text,
-      modelId: "mist",
+      modelId: modelId || "mistv2",
       samplingRate: 22050,
       speedAlpha: 1.0,
       audioFormat: "mp3",
